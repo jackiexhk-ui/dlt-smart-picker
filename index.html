@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>大乐透智能分析与选号助手 V2.1 在线版</title>
+<style>
+:root{--red:#d94b43;--blue:#2879c9;--ink:#202735;--muted:#687386;--bg:#f4f6fa;--card:#fff;--line:#e7ebf1;--green:#25845a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{background:linear-gradient(120deg,#172c50,#315b88);color:#fff;padding:26px 18px 30px}header .wrap,main{max-width:1120px;margin:auto}h1{font-size:24px;margin:0 0 6px}header p{margin:0;color:#d9e5f3}
+main{padding:18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px;margin-bottom:14px;box-shadow:0 3px 14px #182b4508}
+h2{font-size:17px;margin:0 0 12px}.muted{color:var(--muted);font-size:13px}.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.between{justify-content:space-between}
+button{border:0;border-radius:10px;padding:10px 15px;background:#244d79;color:#fff;font-weight:650;cursor:pointer}button.secondary{background:#edf2f8;color:#244d79}button:disabled{opacity:.55;cursor:wait}
+input,select{padding:9px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink);max-width:100%}
+.ball{display:inline-flex;width:34px;height:34px;border-radius:50%;align-items:center;justify-content:center;color:white;font-weight:750;margin:2px;font-variant-numeric:tabular-nums}
+.front{background:var(--red)}.back{background:var(--blue)}.result{padding:12px 0;border-bottom:1px solid var(--line)}.result:last-child{border:0}
+.stat{font-size:23px;font-weight:750}.pill{background:#eef3f8;border-radius:99px;padding:4px 9px;font-size:12px;color:#52647a}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:680px}td,th{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);white-space:nowrap}th{background:#f7f9fc}
+.tablewrap{overflow-x:auto}.bar{height:8px;background:#edf0f5;border-radius:8px;overflow:hidden}.bar i{display:block;height:100%;background:#6389b5}
+.notice{background:#fff8e8;border:1px solid #f1dfb6;padding:12px;border-radius:12px;color:#74551b;font-size:13px}
+.good{color:var(--green);font-weight:700}.section-note{margin:-5px 0 12px}.tag{display:inline-block;background:#f0f3f8;border-radius:7px;padding:3px 7px;margin:2px;font-size:12px;color:#53647b}
+@media(max-width:560px){main{padding:12px}header{padding:22px 15px}}
+</style></head>
+<body>
+<header><div class="wrap"><h1>大乐透智能分析与选号助手 V2.1 在线版</h1><p>六种选号策略 · 100/300/500/1000期滚动回测 · 随机基线对照</p></div></header>
+<main>
+<section class="card">
+ <div class="row between"><div><h2>数据中心</h2><div class="muted" id="dataStatus">尚未加载开奖数据</div></div><button id="refreshBtn">更新开奖数据</button></div>
+ <div class="row" style="margin-top:12px"><span class="pill">数据源：在线同步服务</span><span class="pill" id="period">最新期号：—</span><span class="pill" id="dataRange">数据范围：—</span></div>
+ <p class="muted">网页打开后会尝试自动同步最近历史开奖；同步结果保存在当前浏览器。也可手动刷新或导入官方历史开奖 CSV。回测按期号倒序数据逐期向过去取数，不使用目标期及其之后的开奖结果。</p>
+ <div class="row"><input type="file" id="csvFile" accept=".csv,.txt"></div>
+</section>
+<section class="grid">
+ <div class="card"><h2>数据概览</h2><div class="row between"><span class="muted">已载入开奖期数</span><b class="stat" id="drawCount">0</b></div><div class="row between"><span class="muted">最近一期号码</span><b id="latestNumbers">—</b></div></div>
+ <div class="card"><h2>推荐参数</h2><div class="row between"><label for="window">统计窗口</label><select id="window"><option value="30">近 30 期</option><option value="60" selected>近 60 期</option><option value="100">近 100 期</option><option value="all">全部历史</option></select></div><p class="muted">生成器提供六种策略各一组，另保留原版综合评分三组推荐。</p><button id="generateBtn" class="secondary">重新生成推荐</button></div>
+</section>
+<section class="card"><div class="row between"><h2>本期推荐号码</h2><span class="pill" id="genTime">尚未生成</span></div><div id="recommendations" class="muted">加载历史数据后即可生成推荐。</div></section>
+<section class="card">
+ <div class="row between"><h2>V2.1 历史滚动回测</h2><button id="backtestBtn">开始回测</button></div>
+ <p class="muted section-note">选择最近N期作为测试区间。对每个目标期，只使用该期之前已经开奖的数据构造号码；每种策略每期生成3组。至少需要30期历史训练数据，实际回测期数可能少于所选期数。</p>
+ <div class="row"><label for="testWindow">回测区间</label><select id="testWindow"><option value="100">最近100期</option><option value="300">最近300期</option><option value="500">最近500期</option><option value="1000" selected>最近1000期</option></select><span class="muted" id="backtestStatus">尚未回测</span></div>
+ <div id="backtestSummary" class="muted" style="margin-top:12px">载入至少一批历史数据后开始回测。</div>
+ <div class="tablewrap" style="margin-top:12px"><table id="strategyTable"><thead><tr><th>策略</th><th>有效期数</th><th>前区均命中/组</th><th>后区均命中/组</th><th>前区最高</th><th>后区最高</th><th>前后区均有命中</th><th>相对随机</th></tr></thead><tbody><tr><td colspan="8">暂无回测结果</td></tr></tbody></table></div>
+</section>
+<section class="card"><h2>策略说明</h2><div id="strategyInfo" class="muted"></div></section>
+<section class="grid">
+ <div class="card"><h2>前区号码热度（01–35）</h2><div id="frontStats" class="muted">暂无数据</div></div>
+ <div class="card"><h2>后区号码热度（01–12）</h2><div id="backStats" class="muted">暂无数据</div></div>
+</section>
+<section class="card"><h2>开奖复盘</h2><div class="row"><input id="winPeriod" placeholder="期号，如 2026123"><input id="winFront" placeholder="前区：01 08 15 22 31" style="flex:1;min-width:190px"><input id="winBack" placeholder="后区：03 09" style="flex:1;min-width:140px"><button id="checkBtn">对比推荐</button></div><div id="review" class="muted" style="margin-top:10px">录入开奖号码后，可与当前推荐组合对比。</div></section>
+<div class="notice">重要提示：大乐透每期开奖相互独立，历史频率、冷热、遗漏和结构特征不能预测下一期，也不会提高单注理论中奖概率。回测表现不代表未来收益，策略排名可能来自随机波动。本工具用于统计、模拟与复盘，不承诺中奖。请理性购彩，未成年人不得购买彩票。</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+let draws=[],picks=[],lastBacktest=null;
+const pad=n=>String(n).padStart(2,'0');
+const STRATEGIES=[
+ {id:'综合评分',desc:'长期频率、近期频率、遗漏与位置均衡加权。'},
+ {id:'热号优先',desc:'按历史出现频率加权抽样，偏向高频号码。'},
+ {id:'冷号优先',desc:'按历史低频程度加权抽样，不代表冷号更容易开出。'},
+ {id:'遗漏优先',desc:'按距离上次出现的期数加权抽样。'},
+ {id:'区间奇偶均衡',desc:'尽量满足前区区间分布与奇偶结构，再随机抽取。'},
+ {id:'随机选号',desc:'在合法号码范围内等概率抽取，作为策略之一及随机基线。'}
+];
+function parseCSV(text){
+ const lines=text.replace(/^\\uFEFF/,'').trim().split(/\\r?\\n/),out=[];
+ for(const line of lines.slice(1)){
+  const cells=line.split(/[\\t,;]/).map(x=>x.trim().replace(/^"|"$/g,''));
+  const nums=cells.slice(1).flatMap(x=>x.match(/\\d+/g)||[]).map(Number);
+  if(nums.length>=7){const f=nums.filter(n=>n>=1&&n<=35),b=nums.filter(n=>n>=1&&n<=12);
+   if(f.length>=5&&b.length>=2)out.push({period:cells[0],front:f.slice(0,5).sort((a,b)=>a-b),back:b.slice(0,2).sort((a,b)=>a-b)});
+  }
+ }
+ return normalizeRows(out);
+}
+function normalizeRows(rows){
+ return rows.map(r=>({period:String(r.period||r.issue||r.expect||''),front:(r.front||r.red||r.frontNumbers||[]).map(Number).sort((a,b)=>a-b),back:(r.back||r.blue||r.backNumbers||[]).map(Number).sort((a,b)=>a-b)}))
+ .filter(r=>r.front.length===5&&r.back.length===2&&new Set(r.front).size===5&&new Set(r.back).size===2&&r.front.every(n=>n>=1&&n<=35)&&r.back.every(n=>n>=1&&n<=12));
+}
+async function refresh(){
+ $('refreshBtn').disabled=true;$('dataStatus').textContent='正在从在线服务同步历史开奖…';
+ try{
+  const res=await fetch('/api/draws?ts='+Date.now(),{cache:'no-store'});
+  if(!res.ok)throw Error('在线服务 HTTP '+res.status);
+  const j=await res.json();
+  if(!j.ok||!Array.isArray(j.draws)||!j.draws.length)throw Error(j.error||'未获取到有效开奖数据');
+  const merged=normalizeRows([...(j.draws||[]),...draws]);
+  setDraws(merged);
+  $('dataStatus').textContent='在线同步成功 · '+new Date().toLocaleString()+' · 数据源返回 '+j.draws.length+' 期';
+ }catch(e){
+  $('dataStatus').textContent='在线同步失败：'+e.message+(draws.length?'；继续使用本机已保存的 '+draws.length+' 期数据。':'。请确认部署了在线服务，或稍后重试。');
+ }finally{$('refreshBtn').disabled=false;}
+}
+function setDraws(rows){
+ const seen=new Set();draws=rows.filter(d=>{const k=d.period+'_'+d.front.join('-')+'_'+d.back.join('-');if(seen.has(k))return false;seen.add(k);return true;});
+ draws.sort((a,b)=>b.period.localeCompare(a.period,undefined,{numeric:true}));
+ try{localStorage.setItem('dlt_draws_v21',JSON.stringify(draws));localStorage.setItem('dlt_last_sync',new Date().toISOString());}catch(e){}
+ render();
+}
+function statsFor(history,max,zone){
+ const freq=Array(max+1).fill(0),gap=Array(max+1).fill(history.length+1);
+ history.forEach((d,i)=>zone(d).forEach(n=>{freq[n]++;if(gap[n]===history.length+1)gap[n]=i;}));
+ return {freq,gap};
+}
+function scorePool(history,max,zone,mode='综合评分'){
+ const {freq,gap}=statsFor(history,max,zone),recent=history.slice(0,Math.min(60,history.length)),rf=Array(max+1).fill(0);
+ recent.forEach(d=>zone(d).forEach(n=>rf[n]++));
+ const fmax=Math.max(1,...freq),rmax=Math.max(1,...rf),total=Math.max(1,history.length),rn=Math.max(1,recent.length);
+ return Array.from({length:max},(_,i)=>i+1).map(n=>{
+  const long=freq[n]/total,short=rf[n]/rn,overdue=Math.min(gap[n]/Math.max(1,Math.min(60,total)),2)/2;
+  let score=.35*long/(fmax/total)+.35*short/(rmax/rn)+.15*overdue+.15*(1-Math.abs(n-(max+1)/2)/((max+1)/2));
+  if(mode==='热号优先')score=.7*long/(fmax/total)+.3*short/(rmax/rn);
+  if(mode==='冷号优先')score=1-(.7*long/(fmax/total)+.3*short/(rmax/rn))+.03;
+  if(mode==='遗漏优先')score=(gap[n]+1)/Math.max(1,total);
+  if(mode==='区间奇偶均衡')score=.5*(1-Math.abs(n-(max+1)/2)/((max+1)/2))+.5*(1-Math.abs((freq[n]/total)-(.0)));
+  return {n,score:Math.max(.001,score),freq:freq[n],gap:gap[n]};
+ });
+}
+function weightedPick(pool,count){
+ const chosen=[];
+ while(chosen.length<count){
+  const c=pool.filter(x=>!chosen.includes(x.n)),weights=c.map(x=>Math.max(.001,x.score)**2),sum=weights.reduce((a,b)=>a+b,0);
+  let r=Math.random()*sum,idx=0;for(;idx<weights.length-1&&r>weights[idx];idx++)r-=weights[idx];
+  chosen.push(c[idx].n);
+ }
+ return chosen.sort((a,b)=>a-b);
+}
+function randomPick(max,count){const a=Array.from({length:max},(_,i)=>i+1);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a.slice(0,count).sort((x,y)=>x-y);}
+function balancedPick(pool,count,max,front){
+ let p=weightedPick(pool,count);
+ if(front){
+  for(let tries=0;tries<40;tries++){
+   const odd=p.filter(n=>n%2).length,low=p.filter(n=>n<=12).length,mid=p.filter(n=>n>=13&&n<=24).length;
+   if(odd>=2&&odd<=3&&low>=1&&mid>=1&&p.some(n=>n>=25))break;
+   p=weightedPick(pool,count);
+  }
+ }
+ return p;
+}
+function makePick(history,mode){
+ if(mode==='随机选号')return {front:randomPick(35,5),back:randomPick(12,2)};
+ const fp=scorePool(history,35,d=>d.front,mode),bp=scorePool(history,12,d=>d.back,mode);
+ return {front:mode==='区间奇偶均衡'?balancedPick(fp,5,35,true):weightedPick(fp,5),back:mode==='区间奇偶均衡'?balancedPick(bp,2,12,false):weightedPick(bp,2)};
+}
+function generate(){
+ if(!draws.length){$('recommendations').textContent='请先更新或导入历史数据。';return;}
+ const w=$('window').value==='all'?draws.length:Number($('window').value),history=draws.slice(0,w);
+ picks=[];for(let i=0;i<3;i++)picks.push(makePick(history,'综合评分'));
+ $('genTime').textContent='生成于 '+new Date().toLocaleString();
+ $('recommendations').innerHTML=picks.map((p,i)=>`<div class="result"><b>综合评分 · 第 ${i+1} 组</b><div style="margin-top:7px">${p.front.map(n=>`<span class="ball front">${pad(n)}</span>`).join('')} <b>+</b> ${p.back.map(n=>`<span class="ball back">${pad(n)}</span>`).join('')}</div></div>`).join('');
+}
+function renderStats(id,pool){const sorted=[...pool].sort((a,b)=>b.score-a.score);$(id).innerHTML=sorted.slice(0,10).map(x=>`<div class="row" style="margin:7px 0"><b style="width:25px">${pad(x.n)}</b><div class="bar" style="flex:1"><i style="width:${Math.min(100,Math.round(x.score*100))}%"></i></div><span class="muted">${x.score.toFixed(2)}</span></div>`).join('');}
+function render(){
+ $('drawCount').textContent=draws.length;const d=draws[0];
+ $('period').textContent='最新期号：'+(d?.period||'—');$('dataRange').textContent='数据范围：'+(draws.length?draws[draws.length-1].period+' 至 '+draws[0].period:'—');
+ $('latestNumbers').textContent=d?d.front.map(pad).join(' ')+' + '+d.back.map(pad).join(' '):'—';
+ const w=$('window').value==='all'?draws.length:Number($('window').value);
+ if(draws.length){renderStats('frontStats',scorePool(draws.slice(0,w),35,x=>x.front));renderStats('backStats',scorePool(draws.slice(0,w),12,x=>x.back));generate();}
+ $('strategyInfo').innerHTML=STRATEGIES.map(s=>`<div style="margin:6px 0"><b>${s.id}</b>：${s.desc}</div>`).join('');
+}
+function runBacktest(){
+ if(draws.length<31){$('backtestSummary').textContent='数据不足：至少需要31期开奖数据，建议导入更完整的历史数据。';return;}
+ const requested=Number($('testWindow').value),rows=STRATEGIES.map(s=>({name:s.id,periods:0,groups:0,frontHits:0,backHits:0,maxF:0,maxB:0,both:0,frontDist:[0,0,0,0,0,0],backDist:[0,0,0]}));
+ const byName=Object.fromEntries(rows.map(r=>[r.name,r]));
+ const testCount=Math.min(requested,draws.length-30);
+ for(let i=0;i<testCount;i++){
+  const target=draws[i],history=draws.slice(i+1);
+  if(history.length<30)continue;
+  for(const s of STRATEGIES){
+   const r=byName[s.id];r.periods++;
+   for(let g=0;g<3;g++){
+    const p=makePick(history,s.id),fh=p.front.filter(n=>target.front.includes(n)).length,bh=p.back.filter(n=>target.back.includes(n)).length;
+    r.groups++;r.frontHits+=fh;r.backHits+=bh;r.maxF=Math.max(r.maxF,fh);r.maxB=Math.max(r.maxB,bh);if(fh>0&&bh>0)r.both++;
+    r.frontDist[fh]++;r.backDist[bh]++;
+   }
+  }
+ }
+ const rand=byName['随机选号'],randF=rand.frontHits/Math.max(1,rand.groups),randB=rand.backHits/Math.max(1,rand.groups);
+ $('strategyTable').querySelector('tbody').innerHTML=rows.map(r=>{
+  const af=r.frontHits/Math.max(1,r.groups),ab=r.backHits/Math.max(1,r.groups);
+  const delta=(af-randF)+(ab-randB);
+  return `<tr><td><b>${r.name}</b></td><td>${r.periods}</td><td>${af.toFixed(3)}</td><td>${ab.toFixed(3)}</td><td>${r.maxF}</td><td>${r.maxB}</td><td>${(r.both/Math.max(1,r.groups)*100).toFixed(2)}%</td><td>${r.name==='随机选号'?'基线':(delta>=0?'+':'')+delta.toFixed(3)}</td></tr>`;
+ }).join('');
+ const best=[...rows].sort((a,b)=>(b.frontHits/Math.max(1,b.groups)+b.backHits/Math.max(1,b.groups))-(a.frontHits/Math.max(1,a.groups)+a.backHits/Math.max(1,a.groups)))[0];
+ $('backtestSummary').innerHTML=`<b>回测完成</b>：目标最近 ${requested} 期，实际有效 ${rows[0].periods} 期；每期每策略3组，共 ${rows[0].groups} 组/策略。<br>当前样本综合平均命中较高的策略：<b>${best.name}</b>。随机基线前区均命中 ${randF.toFixed(3)} 个/组，后区均命中 ${randB.toFixed(3)} 个/组。<br><span class="muted">注意：各策略采用随机抽样，单次回测存在随机波动；“相对随机”列为前后区平均命中差之和，不是中奖概率提升。</span>`;
+ $('backtestStatus').textContent='完成 · '+new Date().toLocaleTimeString();lastBacktest=rows;
+}
+$('refreshBtn').onclick=refresh;$('generateBtn').onclick=generate;$('window').onchange=render;$('backtestBtn').onclick=runBacktest;
+$('csvFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;const t=await f.text();const rows=parseCSV(t);if(!rows.length){$('dataStatus').textContent='CSV未识别到有效数据，请检查表头及号码列格式。';return;}setDraws(rows);$('dataStatus').textContent='已导入 '+f.name+'（'+draws.length+' 期）';};
+$('checkBtn').onclick=()=>{
+ const f=$('winFront').value.match(/\\d+/g)?.map(Number)||[],b=$('winBack').value.match(/\\d+/g)?.map(Number)||[];
+ if(f.length!==5||b.length!==2||new Set(f).size!==5||new Set(b).size!==2||!f.every(n=>n>=1&&n<=35)||!b.every(n=>n>=1&&n<=12)){$('review').textContent='请输入不重复且范围正确的5个前区号码和2个后区号码。';return;}
+ $('review').innerHTML=picks.map((p,i)=>{const a=p.front.filter(n=>f.includes(n)).length,c=p.back.filter(n=>b.includes(n)).length;return `第 ${i+1} 组：前区命中 ${a} 个，后区命中 ${c} 个`;}).join('<br>');
+};
+try{const saved=JSON.parse(localStorage.getItem('dlt_draws_v21')||'[]');if(Array.isArray(saved)&&saved.length){draws=normalizeRows(saved);render();$('dataStatus').textContent='已载入本机缓存 '+draws.length+' 期，正在检查更新…';}}catch(e){}
+refresh();
+</script></body></html>
